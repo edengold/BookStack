@@ -398,13 +398,37 @@ class ImageTest extends TestCase
         }
     }
 
-    public function test_secure_image_paths_traversal_causes_500()
+    public function test_secure_image_paths_traversal_causes_404()
     {
         config()->set('filesystems.images', 'local_secure');
         $this->asEditor();
 
         $resp = $this->get('/uploads/images/../../logs/laravel.log');
-        $resp->assertStatus(500);
+        $resp->assertStatus(404);
+    }
+
+    public function test_secure_images_inaccessible_without_relation_permission()
+    {
+        config()->set('filesystems.images', 'local_secure');
+        $this->asEditor();
+        $galleryFile = $this->files->uploadedImage('my-secure-test-upload.png');
+        $page = $this->entities->page();
+
+        $upload = $this->call('POST', '/images/gallery', ['uploaded_to' => $page->id], [], ['file' => $galleryFile], []);
+        $upload->assertStatus(200);
+        $expectedUrl = url('uploads/images/gallery/' . date('Y-m') . '/my-secure-test-upload.png');
+        $expectedPath = storage_path('uploads/images/gallery/' . date('Y-m') . '/my-secure-test-upload.png');
+
+        $this->get($expectedUrl)->assertOk();
+
+        $this->permissions->setEntityPermissions($page, [], []);
+
+        $resp = $this->get($expectedUrl);
+        $resp->assertNotFound();
+
+        if (file_exists($expectedPath)) {
+            unlink($expectedPath);
+        }
     }
 
     public function test_secure_image_paths_traversal_on_non_secure_images_causes_404()

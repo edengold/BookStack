@@ -219,8 +219,8 @@ class ImageService
             return null;
         }
 
-        // Apply access control when local_secure_restricted images are active
-        if ($this->storage->usingSecureRestrictedImages()) {
+        // Apply access control when secure images are active
+        if ($this->storage->usingSecureImages()) {
             if (!$this->checkUserHasAccessToRelationOfImageAtPath($storagePath)) {
                 return null;
             }
@@ -261,7 +261,7 @@ class ImageService
      */
     public function pathAccessible(string $imagePath): bool
     {
-        if ($this->storage->usingSecureRestrictedImages() && !$this->checkUserHasAccessToRelationOfImageAtPath($imagePath)) {
+        if ($this->storage->usingSecureImages() && !$this->checkUserHasAccessToRelationOfImageAtPath($imagePath)) {
             return false;
         }
 
@@ -277,7 +277,7 @@ class ImageService
      */
     public function imageAccessible(Image $image): bool
     {
-        if ($this->storage->usingSecureRestrictedImages() && !$this->checkUserHasAccessToRelationOfImage($image)) {
+        if ($this->storage->usingSecureImages() && !$this->checkUserHasAccessToRelationOfImage($image)) {
             return false;
         }
 
