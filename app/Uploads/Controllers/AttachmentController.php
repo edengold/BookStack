@@ -13,10 +13,11 @@ use BookStack\Uploads\Attachment;
 use BookStack\Uploads\AttachmentService;
 use BookStack\Util\UrlFilter;
 use Exception;
-use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\MessageBag;
 use Illuminate\Validation\ValidationException;
+use League\Flysystem\UnableToReadFile;
+use League\Flysystem\UnableToRetrieveMetadata;
 
 class AttachmentController extends Controller
 {
@@ -208,7 +209,6 @@ class AttachmentController extends Controller
     /**
      * Get an attachment from storage.
      *
-     * @throws FileNotFoundException
      * @throws NotFoundException
      */
     public function get(Request $request, string $attachmentId)
@@ -232,8 +232,13 @@ class AttachmentController extends Controller
         }
 
         $fileName = $attachment->getFileName();
-        $attachmentStream = $this->attachmentService->streamAttachmentFromStorage($attachment);
-        $attachmentSize = $this->attachmentService->getAttachmentFileSize($attachment);
+
+        try {
+            $attachmentStream = $this->attachmentService->streamAttachmentFromStorage($attachment);
+            $attachmentSize = $this->attachmentService->getAttachmentFileSize($attachment);
+        } catch (UnableToReadFile | UnableToRetrieveMetadata | FileNotFoundException $exception) {
+            throw new NotFoundException(trans('errors.attachment_not_found'));
+        }
 
         if ($request->input('open') === 'true') {
             return $this->createDownload()->streamedInline($attachmentStream, $fileName, $attachmentSize);

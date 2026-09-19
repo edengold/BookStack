@@ -5,6 +5,7 @@ namespace BookStack\Uploads\Controllers;
 use BookStack\Entities\EntityExistsRule;
 use BookStack\Entities\Queries\PageQueries;
 use BookStack\Exceptions\FileUploadException;
+use BookStack\Exceptions\NotFoundException;
 use BookStack\Http\ApiController;
 use BookStack\Permissions\Permission;
 use BookStack\Uploads\Attachment;
@@ -13,6 +14,8 @@ use Exception;
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use League\Flysystem\UnableToReadFile;
+use League\Flysystem\UnableToRetrieveMetadata;
 
 class AttachmentApiController extends ApiController
 {
@@ -75,7 +78,7 @@ class AttachmentApiController extends ApiController
      * The attachment link or file content is provided via a 'content' property.
      * For files the content will be base64 encoded.
      *
-     * @throws FileNotFoundException
+     * @throws NotFoundException
      */
     public function read(string $id)
     {
@@ -102,7 +105,11 @@ class AttachmentApiController extends ApiController
         $json = $attachment->toJson();
         $jsonParts = explode($splitter, $json);
         // Get a stream for the file data from storage
-        $stream = $this->attachmentService->streamAttachmentFromStorage($attachment);
+        try {
+            $stream = $this->attachmentService->streamAttachmentFromStorage($attachment);
+        } catch (UnableToReadFile | UnableToRetrieveMetadata | FileNotFoundException $exception) {
+            throw new NotFoundException(trans('errors.attachment_not_found'));
+        }
 
         return response()->stream(function () use ($jsonParts, $stream) {
             // Output the pre-content JSON data

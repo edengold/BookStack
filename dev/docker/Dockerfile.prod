@@ -20,7 +20,9 @@ COPY artisan ./artisan
 RUN mkdir -p bootstrap/cache storage/framework/views \
         storage/framework/cache \
         storage/framework/sessions \
-        storage/fonts && \
+        storage/fonts \
+        storage/uploads/files \
+        storage/uploads/images && \
     composer dump-autoload --optimize --no-interaction
 
 # ---- Stage 2: JS/CSS production assets ----
