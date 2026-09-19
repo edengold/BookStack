@@ -30,12 +30,19 @@ Route::get('/manifest.json', [MetaController::class, 'pwaManifest']);
 Route::get('/licenses', [MetaController::class, 'licenses']);
 Route::get('/opensearch.xml', [MetaController::class, 'opensearch']);
 
+// File serving routes. These sit outside the auth group so temporary signed
+// URLs (minted at render time) can be accessed without session authentication.
+// Unsigned/invalid/expired requests fall through to the standard auth behaviour
+// via the "signed-file" middleware.
+Route::get('/uploads/images/{path}', [UploadControllers\ImageController::class, 'showImage'])
+    ->name('uploads.images')->middleware('signed-file')
+    ->where('path', '.*$');
+
+Route::get('/attachments/{id}', [UploadControllers\AttachmentController::class, 'get'])
+    ->name('attachments.get')->middleware('signed-file');
+
 // Authenticated routes...
 Route::middleware('auth')->group(function () {
-
-    // Secure images routing
-    Route::get('/uploads/images/{path}', [UploadControllers\ImageController::class, 'showImage'])
-        ->where('path', '.*$');
 
     // API docs routes
     Route::get('/api', [ApiDocsController::class, 'redirect']);
@@ -159,7 +166,6 @@ Route::middleware('auth')->group(function () {
     Route::delete('/images/{id}', [UploadControllers\ImageController::class, 'destroy']);
 
     // Attachments routes
-    Route::get('/attachments/{id}', [UploadControllers\AttachmentController::class, 'get']);
     Route::post('/attachments/upload', [UploadControllers\AttachmentController::class, 'upload']);
     Route::post('/attachments/upload/{id}', [UploadControllers\AttachmentController::class, 'uploadUpdate']);
     Route::post('/attachments/link', [UploadControllers\AttachmentController::class, 'attachLink']);

@@ -12,6 +12,7 @@ use BookStack\Permissions\Permission;
 use BookStack\Theming\ThemeEvents;
 use BookStack\Uploads\ImageRepo;
 use BookStack\Uploads\ImageService;
+use BookStack\Uploads\FileUrlSigner;
 use BookStack\Users\Models\User;
 use BookStack\Util\HtmlContentFilter;
 use BookStack\Util\HtmlContentFilterConfig;
@@ -39,6 +40,8 @@ class PageContent
      */
     public function setNewHTML(string $html, User $updater): void
     {
+        // Editor content carries render-time signatures; storage keeps raw URLs.
+        $html = app(FileUrlSigner::class)->stripHtmlContent($html);
         $html = $this->extractBase64ImagesFromHtml($html, $updater);
         $html = $this->formatHtml($html);
 
@@ -57,6 +60,8 @@ class PageContent
      */
     public function setNewMarkdown(string $markdown, User $updater): void
     {
+        // Editor content carries render-time signatures; storage keeps raw URLs.
+        $markdown = app(FileUrlSigner::class)->stripMarkdownContent($markdown);
         $markdown = $this->extractBase64ImagesFromMarkdown($markdown, $updater);
         $this->page->markdown = $markdown;
         $html = (new MarkdownToHtml($markdown))->convert();
@@ -303,7 +308,7 @@ class PageContent
      */
     public function toPlainText(): string
     {
-        $html = $this->render(true);
+        $html = $this->render(true, false);
         $converter = new HtmlToPlainText();
         return $converter->convert($html);
     }
@@ -311,12 +316,12 @@ class PageContent
     /**
      * Render the page for viewing.
      */
-    public function render(bool $blankIncludes = false): string
+    public function render(bool $blankIncludes = false, bool $signed = true): string
     {
         $html = $this->page->html ?? '';
 
         if (empty($html)) {
-            return $this->handlePostRender('');
+            return $this->handlePostRender('', $signed);
         }
 
         $doc = new HtmlDocument($html);
@@ -337,7 +342,7 @@ class PageContent
         $cacheKey = $this->getContentCacheKey($doc->getBodyInnerHtml());
         $cached = cache()->get($cacheKey, null);
         if ($cached !== null) {
-            return $this->handlePostRender($cached);
+            return $this->handlePostRender($cached, $signed);
         }
 
         $filterConfig = HtmlContentFilterConfig::fromConfigString(config('app.content_filtering'));
@@ -347,11 +352,17 @@ class PageContent
         $cacheTime = 86400 * 7; // 1 week
         cache()->put($cacheKey, $filtered, $cacheTime);
 
-        return $this->handlePostRender($filtered);
+        return $this->handlePostRender($filtered, $signed);
     }
 
-    protected function handlePostRender(string $html): string
+    protected function handlePostRender(string $html, bool $signed = true): string
     {
+        // Sign at render time, after the cache boundary, so stored content keeps
+        // raw URLs while the served markup carries expiring signatures.
+        if ($signed) {
+            $html = app(FileUrlSigner::class)->signHtmlContent($html);
+        }
+
         $themeResult = Theme::dispatch(ThemeEvents::PAGE_CONTENT_POST_RENDER, $html, $this->page);
         return is_string($themeResult) ? $themeResult : $html;
     }

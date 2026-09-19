@@ -96,7 +96,9 @@ class ImageStorage
      */
     public function urlToPath(string $url): ?string
     {
-        $url = ltrim(trim($url), '/');
+        // Strip any query parameters (like temporary signature params) and
+        // surrounding whitespace/leading slashes before path resolution.
+        $url = ltrim(trim(Str::before($url, '?')), '/');
 
         // Handle potential relative paths
         $isRelative = !str_starts_with($url, 'http');

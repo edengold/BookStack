@@ -5,6 +5,7 @@ namespace BookStack\Entities\Tools;
 use BookStack\Entities\Models\Book;
 use BookStack\Entities\Models\Bookshelf;
 use BookStack\Entities\Models\Chapter;
+use BookStack\Uploads\FileUrlSigner;
 use BookStack\Util\HtmlContentFilter;
 use BookStack\Util\HtmlContentFilterConfig;
 
@@ -26,6 +27,9 @@ class EntityHtmlDescription
      */
     public function set(string $html, string|null $plaintext = null): void
     {
+        // Storage keeps raw URLs; temporary signature parameters are stripped
+        // so they never persist into the saved description.
+        $html = app(FileUrlSigner::class)->stripHtmlContent($html);
         $this->html = $html;
         $this->entity->description_html = $this->html;
 
@@ -57,7 +61,9 @@ class EntityHtmlDescription
         }
 
         $filter = new HtmlContentFilter(new HtmlContentFilterConfig());
-        return $filter->filterString($html);
+        $filtered = $filter->filterString($html);
+
+        return app(FileUrlSigner::class)->signHtmlContent($filtered);
     }
 
     public function getPlain(): string

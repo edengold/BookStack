@@ -216,10 +216,14 @@ class AttachmentController extends Controller
         /** @var Attachment $attachment */
         $attachment = Attachment::query()->findOrFail($attachmentId);
 
-        try {
-            $page = $this->pageQueries->findVisibleByIdOrFail($attachment->uploaded_to);
-        } catch (NotFoundException $exception) {
-            throw new NotFoundException(trans('errors.attachment_not_found'));
+        // With a valid temporary signed URL the permission check was already
+        // performed at render time when the signature was minted, so skip it.
+        if (request()->attributes->get('signed-file-access') !== true) {
+            try {
+                $this->pageQueries->findVisibleByIdOrFail($attachment->uploaded_to);
+            } catch (NotFoundException $exception) {
+                throw new NotFoundException(trans('errors.attachment_not_found'));
+            }
         }
 
         if ($attachment->external) {

@@ -4,6 +4,7 @@ namespace BookStack\Entities\Tools;
 
 use BookStack\Entities\Models\Book;
 use BookStack\Entities\Models\Bookshelf;
+use BookStack\Uploads\FileUrlSigner;
 use BookStack\Uploads\Image;
 use Exception;
 use Illuminate\Database\Eloquent\Builder;
@@ -55,7 +56,9 @@ class EntityCover
         }
 
         try {
-            return $this->getImage()?->getThumb($width, $height, false) ?? $default;
+            $thumb = $this->getImage()?->getThumb($width, $height, false) ?? $default;
+
+            return app(FileUrlSigner::class)->signedImageUrl($thumb);
         } catch (Exception $err) {
             return $default;
         }

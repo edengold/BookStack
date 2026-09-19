@@ -8,6 +8,7 @@ use BookStack\Http\Controller;
 use BookStack\Permissions\Permission;
 use BookStack\Uploads\ImageRepo;
 use BookStack\Uploads\ImageResizer;
+use BookStack\Uploads\FileUrlSigner;
 use BookStack\Util\OutOfMemoryHandler;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -82,6 +83,8 @@ class GalleryImageController extends Controller
         } catch (ImageUploadException $e) {
             return response($e->getMessage(), 500);
         }
+
+        $image->setAttribute('url', app(FileUrlSigner::class)->signedImageUrl($image->url));
 
         return response()->json($image);
     }

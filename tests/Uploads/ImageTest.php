@@ -3,6 +3,7 @@
 namespace Tests\Uploads;
 
 use BookStack\Entities\Repos\PageRepo;
+use BookStack\Uploads\FileUrlSigner;
 use BookStack\Uploads\Image;
 use BookStack\Uploads\ImageService;
 use BookStack\Uploads\UserAvatars;
@@ -494,15 +495,56 @@ class ImageTest extends TestCase
 
         $avatarUrl = $user->getAvatar();
 
+        // Signed avatar URLs grant guest access even without public visibility.
         $resp = $this->get($avatarUrl);
+        $resp->assertOk();
+
+        // Unsigned variants follow standard auth behaviour (redirect to login
+        // while the app is private, 200 once public access is enabled).
+        $unsignedUrl = $this->withSigner(fn (FileUrlSigner $s) => $s->stripUrlParams($avatarUrl));
+        $resp = $this->get($unsignedUrl);
         $resp->assertRedirect('/login');
 
         $this->permissions->makeAppPublic();
 
-        $resp = $this->get($avatarUrl);
+        $resp = $this->get($unsignedUrl);
         $resp->assertOk();
 
         $this->files->deleteAtRelativePath($user->avatar->path);
+    }
+
+    /**
+     * Invoke the given callable with the application's FileUrlSigner.
+     */
+    protected function withSigner(callable $callback): mixed
+    {
+        return $callback($this->app->make(FileUrlSigner::class));
+    }
+
+    public function test_signed_url_guest_access_with_local_secure()
+    {
+        config()->set('filesystems.images', 'local_secure');
+        $this->asEditor();
+        $galleryFile = $this->files->uploadedImage('my-signed-guest-test.png');
+        $page = $this->entities->page();
+
+        $upload = $this->call('POST', '/images/gallery', ['uploaded_to' => $page->id], [], ['file' => $galleryFile], []);
+        $upload->assertStatus(200);
+        $signedUrl = json_decode($upload->getContent(), true)['url'];
+        $this->assertStringContainsString('signature=', $signedUrl, 'Local-secure image URLs are signed at creation');
+        $unsignedUrl = $this->app->make(FileUrlSigner::class)->stripUrlParams($signedUrl);
+        $this->setSettings(['app-public' => 'false']);
+
+        auth()->logout();
+
+        // Valid signed URL: guest access without public visibility.
+        $this->get($signedUrl)->assertOk();
+
+        // Unsigned/invalid URLs fall back to standard auth behaviour.
+        $resp = $this->get($unsignedUrl);
+        $resp->assertRedirect('/login');
+        $resp = $this->get($signedUrl . 'X');
+        $resp->assertRedirect('/login');
     }
 
     public function test_secure_restricted_images_inaccessible_without_relation_permission()

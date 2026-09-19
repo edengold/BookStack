@@ -7,6 +7,7 @@ use BookStack\Entities\Models\Chapter;
 use BookStack\Entities\Models\Page;
 use BookStack\Exports\ZipExports\ZipExportFiles;
 use BookStack\Exports\ZipExports\ZipValidationHelper;
+use BookStack\Uploads\FileUrlSigner;
 
 final class ZipExportBook extends ZipExportModel
 {
@@ -55,7 +56,7 @@ final class ZipExportBook extends ZipExportModel
         $instance = new self();
         $instance->id = $model->id;
         $instance->name = $model->name;
-        $instance->description_html = $model->descriptionInfo()->getHtml();
+        $instance->description_html = app(FileUrlSigner::class)->stripHtmlContent($model->descriptionInfo()->getHtml());
 
         if ($model->coverInfo()->exists()) {
             $instance->cover = $files->referenceForImage($model->coverInfo()->getImage());

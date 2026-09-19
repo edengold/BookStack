@@ -6,6 +6,7 @@ use BookStack\Entities\Models\Page;
 use BookStack\Entities\Tools\PageContent;
 use BookStack\Exports\ZipExports\ZipExportFiles;
 use BookStack\Exports\ZipExports\ZipValidationHelper;
+use BookStack\Uploads\FileUrlSigner;
 
 final class ZipExportPage extends ZipExportModel
 {
@@ -41,7 +42,9 @@ final class ZipExportPage extends ZipExportModel
         $instance = new self();
         $instance->id = $model->id;
         $instance->name = $model->name;
-        $instance->html = (new PageContent($model))->render();
+        // Zip export references resolve against raw stored URLs, so temporary
+        // signature parameters are stripped before inclusion.
+        $instance->html = app(FileUrlSigner::class)->stripHtmlContent((new PageContent($model))->render());
         $instance->priority = $model->priority;
 
         if (!empty($model->markdown)) {

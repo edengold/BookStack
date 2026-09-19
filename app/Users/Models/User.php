@@ -14,6 +14,7 @@ use BookStack\App\SluggableInterface;
 use BookStack\Permissions\Permission;
 use BookStack\Translation\LocaleDefinition;
 use BookStack\Translation\LocaleManager;
+use BookStack\Uploads\FileUrlSigner;
 use BookStack\Uploads\Image;
 use Carbon\Carbon;
 use Exception;
@@ -236,6 +237,7 @@ class User extends Model implements AuthenticatableContract, CanResetPasswordCon
             $avatar = $default;
         }
 
+        $avatar = app(FileUrlSigner::class)->signedImageUrl($avatar);
         $this->avatarUrl = $avatar;
 
         return $avatar;

@@ -11,6 +11,7 @@ use BookStack\Uploads\Image;
 use BookStack\Uploads\ImageRepo;
 use BookStack\Uploads\ImageResizer;
 use BookStack\Uploads\ImageService;
+use BookStack\Uploads\FileUrlSigner;
 use BookStack\Util\OutOfMemoryHandler;
 use Exception;
 use Illuminate\Http\Request;
@@ -21,6 +22,7 @@ class ImageController extends Controller
         protected ImageRepo $imageRepo,
         protected ImageService $imageService,
         protected ImageResizer $imageResizer,
+        protected FileUrlSigner $signer,
     ) {
     }
 
@@ -56,7 +58,7 @@ class ImageController extends Controller
         $image = $this->imageRepo->updateImageDetails($image, $data);
 
         return view('pages.parts.image-manager-form', [
-            'image'          => $image,
+            'image'          => $this->withSignedUrls($image),
             'dependantPages' => null,
         ]);
     }
@@ -103,7 +105,7 @@ class ImageController extends Controller
         }
 
         $viewData = [
-            'image'          => $image,
+            'image'          => $this->withSignedUrls($image),
             'dependantPages' => $dependantPages ?? null,
             'warning'        => '',
         ];
@@ -166,5 +168,21 @@ class ImageController extends Controller
         if ($relatedPage) {
             $this->checkOwnablePermission(Permission::PageView, $relatedPage);
         }
+    }
+
+    /**
+     * Sign the URL-bearing fields of the given image for editor toolbox display.
+     */
+    protected function withSignedUrls(Image $image): Image
+    {
+        $image->setAttribute('url', $this->signer->signedImageUrl($image->url));
+        if (is_array($image->thumbs)) {
+            $image->thumbs = array_map(
+                fn (string $thumb) => $this->signer->signedImageUrl($thumb),
+                $image->thumbs
+            );
+        }
+
+        return $image;
     }
 }

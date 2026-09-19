@@ -37,6 +37,9 @@ return [
     // The limit for all uploaded files, including images and attachments in MB.
     'upload_limit' => env('FILE_UPLOAD_SIZE_LIMIT', 50),
 
+    // Expiration time, in seconds, for temporary signed file URLs added at render time.
+    'file_url_expiry' => env('FILE_URL_EXPIRY', 3600),
+
     // Control the behaviour of content filtering, primarily used for page content.
     // This setting is a string of characters which represent different available filters:
     // - j - Filter out JavaScript and unknown binary data based content

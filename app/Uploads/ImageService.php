@@ -236,7 +236,8 @@ class ImageService
             return null;
         }
 
-        $extension = pathinfo($url, PATHINFO_EXTENSION);
+        // Extension comes from the stored path, without any URL query suffix.
+        $extension = pathinfo(Str::before($url, '?'), PATHINFO_EXTENSION);
         if ($extension === 'svg') {
             $extension = 'svg+xml';
         }
@@ -261,6 +262,10 @@ class ImageService
      */
     public function pathAccessible(string $imagePath): bool
     {
+        if ($this->signedAccessGranted()) {
+            return $this->imageFileExists($imagePath, 'gallery');
+        }
+
         if ($this->storage->usingSecureRestrictedImages() && !$this->checkUserHasAccessToRelationOfImageAtPath($imagePath)) {
             return false;
         }
@@ -277,6 +282,10 @@ class ImageService
      */
     public function imageAccessible(Image $image): bool
     {
+        if ($this->signedAccessGranted()) {
+            return $this->imageFileExists($image->path, $image->type);
+        }
+
         if ($this->storage->usingSecureRestrictedImages() && !$this->checkUserHasAccessToRelationOfImage($image)) {
             return false;
         }
@@ -289,13 +298,27 @@ class ImageService
     }
 
     /**
+     * Check if access was granted to the current request via a valid temporary
+     * signed file URL. The signature is minted at render time, for a user who
+     * passed the relevant permission checks then, so it acts as a render-time
+     * permission grant for this file only.
+     */
+    protected function signedAccessGranted(): bool
+    {
+        return request()->attributes->get('signed-file-access', false) === true;
+    }
+
+    /**
      * Check if the current user should be blocked from accessing images based on if secure images are enabled
      * and if public access is enabled for the application.
      */
     protected function blockedBySecureImages(): bool
     {
-        $enforced = $this->storage->usingSecureImages() && !setting('app-public');
+        if ($this->signedAccessGranted()) {
+            return false;
+        }
 
+        $enforced = $this->storage->usingSecureImages() && !setting('app-public');
         return $enforced && user()->isGuest();
     }
 

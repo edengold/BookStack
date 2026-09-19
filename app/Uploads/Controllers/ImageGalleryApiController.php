@@ -10,6 +10,7 @@ use BookStack\Uploads\Image;
 use BookStack\Uploads\ImageRepo;
 use BookStack\Uploads\ImageResizer;
 use BookStack\Uploads\ImageService;
+use BookStack\Uploads\FileUrlSigner;
 use Illuminate\Http\Request;
 
 class ImageGalleryApiController extends ApiController
@@ -55,8 +56,13 @@ class ImageGalleryApiController extends ApiController
             ->select($this->fieldsToExpose)
             ->whereIn('type', ['gallery', 'drawio']);
 
+        $signer = app(FileUrlSigner::class);
         return $this->apiListingResponse($images, [
             ...$this->fieldsToExpose
+        ], [
+            function (Image $image) use ($signer) {
+                $image->setAttribute('url', $signer->signedImageUrl($image->url));
+            }
         ]);
     }
 
@@ -122,7 +128,9 @@ class ImageGalleryApiController extends ApiController
     {
         $data = $this->validate($request, $this->rules()['readDataForUrl']);
         $basePath = url('/uploads/images/');
+        // Strip any temporary signature parameters so the stored path resolves.
         $imagePath = str_replace($basePath, '', $data['url']);
+        $imagePath = \Illuminate\Support\Str::before($imagePath, '?');
 
         if (!$this->imageService->pathAccessible($imagePath)) {
             throw (new NotFoundException(trans('errors.image_not_found')))
@@ -173,12 +181,20 @@ class ImageGalleryApiController extends ApiController
     protected function formatForSingleResponse(Image $image): array
     {
         $this->imageResizer->loadGalleryThumbnailsForImage($image, false);
+        $signer = app(FileUrlSigner::class);
+        $image->setAttribute('url', $signer->signedImageUrl($image->url));
+        if (is_array($image->getAttribute('thumbs'))) {
+            $image->thumbs = array_map(
+                fn (string $thumb) => $signer->signedImageUrl($thumb),
+                $image->getAttribute('thumbs')
+            );
+        }
         $data = $image->toArray();
         $data['created_by'] = $image->createdBy;
         $data['updated_by'] = $image->updatedBy;
         $data['content'] = [];
 
-        $escapedUrl = htmlentities($image->url);
+        $escapedUrl = htmlentities($image->getAttribute('url'));
         $escapedName = htmlentities($image->name);
 
         if ($image->type === 'drawio') {
