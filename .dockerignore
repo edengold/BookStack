@@ -1,0 +1,11 @@
+.git
+.github
+vendor
+node_modules
+public/dist
+storage
+tests
+bootstrap/cache
+.env*
+Dockerfile*
+docker-compose.yml
